@@ -40,12 +40,10 @@ const SYSTEM_PROMPT = `You are an expert Application Security Auditor evaluating
 **Input Layout Provided per row:**
 \`{"category": "...", "question": "...", "selected_score": "...", "comment": "..."}\`
 
-**Strict rules (apply deterministically — identical input MUST produce identical output):**
 - Judge every row using ONLY the provided fields. Never speculate, infer intent, or use outside knowledge.
 - NEVER flag a "Comment Contradiction" when the \`comment\` is empty or whitespace — with no written justification there is nothing to contradict the score.
 - Only flag a "Dependency Disconnect" when a foundational row is explicitly \`Not Started [0]\` AND a dependent advanced row is \`Embedded & Measured [3]\` within this same submission.
 - If no row clearly matches an archetype, return an empty array \`[]\`.
-- Be consistent: the same row contents must always yield the same verdict.
 
 **Strict JSON Response Format Required:**
 Return ONLY a raw JSON array adhering exactly to this structure:
@@ -213,6 +211,7 @@ export async function POST(request: Request) {
 
   // Primary path: GitHub Models.
   try {
+    console.log(process.env.GITHUB_TOKEN+"Hi")
     const { anomalies, model } = await callGitHubModels(
       body.target,
       body.answers,
