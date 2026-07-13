@@ -71,6 +71,18 @@ export function detectAnomaliesLocal(records: AnswerRecord[]): Anomaly[] {
     }
   }
 
+  // --- Archetype 3: N/A without justification.
+  for (const r of records) {
+    if (r.tier === "na" && (!r.comment || !r.comment.trim())) {
+      push(
+        "Missing N/A Justification",
+        r.question,
+        "Medium",
+        `Marked as "Not Applicable" but no explanation is provided. N/A selections require a justification explaining why this control does not apply to the assessment target.`,
+      );
+    }
+  }
+
   return sortAnomalies(anomalies);
 }
 
@@ -104,6 +116,7 @@ function coerceSeverity(value: unknown): Severity {
 function coerceType(value: unknown): AnomalyType {
   const s = String(value ?? "").toLowerCase();
   if (s.includes("depend")) return "Dependency Disconnect";
+  if (s.includes("n/a") || s.includes("justification")) return "Missing N/A Justification";
   return "Comment Contradiction";
 }
 

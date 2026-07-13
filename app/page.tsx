@@ -3,7 +3,6 @@
 import * as React from "react";
 import {
   Download,
-  FolderGit2,
   Loader2,
   ScanSearch,
   ShieldHalf,
@@ -17,7 +16,6 @@ import { StageDistribution } from "@/components/StageDistribution";
 import { CategoryBreakdown } from "@/components/CategoryBreakdown";
 import { AnomalyReport } from "@/components/AnomalyReport";
 import { DataTable } from "@/components/DataTable";
-import { Button } from "@/components/ui/button";
 import { parseFile } from "@/lib/parser";
 import { exportAssessmentWorkbook } from "@/lib/export";
 import {
@@ -52,6 +50,33 @@ export default function Page() {
 
   const [exporting, setExporting] = React.useState(false);
   const [exportError, setExportError] = React.useState<string | null>(null);
+  const [remedies, setRemedies] = React.useState<string[]>([]);
+
+  // Fetch remediation suggestions whenever data/target change
+  React.useEffect(() => {
+    if (!data || !target) {
+      setRemedies([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const records = getAnswerRecords(data, target);
+        const res = await fetch("/api/remediate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ category: "All", answers: records }),
+        });
+        if (res.ok && !cancelled) {
+          const json = await res.json();
+          setRemedies(json.remedies ?? []);
+        }
+      } catch {
+        // silent — remedies are optional
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [data, target]);
 
   const runAnalysis = React.useCallback(
     async (dataset: ParsedData, targetName: string) => {
@@ -160,12 +185,33 @@ export default function Page() {
     setExporting(true);
     setExportError(null);
     try {
+      // Use existing remedies, or fetch fresh if not yet available
+      let exportRemedies = remedies;
+      if (exportRemedies.length === 0) {
+        try {
+          const records = getAnswerRecords(data, target);
+          const res = await fetch("/api/remediate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ category: "All", answers: records }),
+          });
+          if (res.ok) {
+            const json = await res.json();
+            exportRemedies = json.remedies ?? [];
+            setRemedies(exportRemedies);
+          }
+        } catch {
+          // Continue without remedies
+        }
+      }
+
       await exportAssessmentWorkbook({
         rawFile,
         data,
         target,
         projectName,
         anomalies,
+        remedies: exportRemedies.length > 0 ? exportRemedies : undefined,
       });
     } catch {
       setExportError(
@@ -174,7 +220,7 @@ export default function Page() {
     } finally {
       setExporting(false);
     }
-  }, [rawFile, data, target, projectName, anomalies]);
+  }, [rawFile, data, target, projectName, anomalies, remedies]);
 
   const maturity = React.useMemo(
     () => (data && target ? getMaturity(data, target) : null),
@@ -182,6 +228,10 @@ export default function Page() {
   );
   const categoryMetrics = React.useMemo(
     () => (data && target ? getCategoryBreakdown(data, target) : []),
+    [data, target],
+  );
+  const answerRecords = React.useMemo(
+    () => (data && target ? getAnswerRecords(data, target) : []),
     [data, target],
   );
 
@@ -208,55 +258,6 @@ export default function Page() {
                 description="Cumulative maturity score and stage distribution for the selected assessment."
               />
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                  <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:max-w-2xl">
-                    <TeamSelector
-                      options={data.assessments}
-                      value={target}
-                      onChange={handleTargetChange}
-                    />
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="project-name"
-                        className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-slate-500"
-                      >
-                        <FolderGit2 className="h-3.5 w-3.5" />
-                        Project Name
-                      </label>
-                      <input
-                        id="project-name"
-                        type="text"
-                        value={projectName}
-                        onChange={(e) => setProjectName(e.target.value)}
-                        placeholder="e.g. Payments Platform"
-                        className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                      />
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={handleExport}
-                    disabled={exporting || anomalyLoading}
-                    className="h-9 shrink-0"
-                    title={
-                      anomalyLoading
-                        ? "Waiting for anomaly analysis to finish…"
-                        : "Export the original sheet, scored matrix, and anomalies"
-                    }
-                  >
-                    {exporting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                    {exporting ? "Exporting…" : "Export to Excel"}
-                  </Button>
-                </div>
-                {exportError && (
-                  <p className="mt-3 text-xs text-rose-600">{exportError}</p>
-                )}
-              </div>
 
               <div className="grid gap-5 lg:grid-cols-3">
                 <div className="lg:col-span-1">
@@ -272,7 +273,7 @@ export default function Page() {
               </div>
 
               {categoryMetrics.length > 0 && (
-                <CategoryBreakdown metrics={categoryMetrics} />
+                <CategoryBreakdown metrics={categoryMetrics} answers={answerRecords} />
               )}
             </section>
 
@@ -294,12 +295,30 @@ export default function Page() {
 
             {/* Section D: Deep-dive raw matrix */}
             <section className="space-y-5">
-              <SectionHeading
-                eyebrow="Source Data"
-                title="Deep-Dive Assessment Matrix"
-                description="Color-coded scores with per-item description & evidence on click."
-              />
-              <DataTable data={data} target={target} />
+              <div className="flex items-center justify-between gap-4">
+                <SectionHeading
+                  eyebrow="Source Data"
+                  title="Deep-Dive Assessment Matrix"
+                  description="Color-coded scores with per-item description & evidence on click."
+                />
+                <button
+                  type="button"
+                  onClick={handleExport}
+                  disabled={exporting}
+                  className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {exporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  Export Excel
+                </button>
+              </div>
+              {exportError && (
+                <p className="text-sm text-rose-600">{exportError}</p>
+              )}
+              <DataTable data={data} target={target} remedies={remedies} />
             </section>
           </div>
         )}
@@ -332,7 +351,7 @@ function Hero({
     <div className="mx-auto flex max-w-2xl flex-col items-center py-10 text-center sm:py-16">
       <span className="mb-5 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 animate-fade-in">
         <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-        AI-Powered Security Maturity Tracker
+        Security Maturity Tracker
       </span>
 
       <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl animate-fade-in">

@@ -82,8 +82,8 @@ export interface CategoryMetric {
 /** Severity levels surfaced by the anomaly engine. */
 export type Severity = "Low" | "Medium" | "High";
 
-/** The two anomaly archetypes surfaced by the engine. */
-export type AnomalyType = "Comment Contradiction" | "Dependency Disconnect";
+/** The anomaly archetypes surfaced by the engine. */
+export type AnomalyType = "Comment Contradiction" | "Dependency Disconnect" | "Missing N/A Justification";
 
 /** A detected justification / dependency anomaly. */
 export interface Anomaly {
@@ -116,6 +116,10 @@ export interface AnswerRecord {
   /** Parsed tier (used by the local rule engine). */
   tier: ScoreTier | null;
   comment: string;
+  /** What this assessment item actually means. */
+  description: string;
+  /** Examples / evidence teams can reference. */
+  evidence: string;
 }
 
 /** Request payload for the anomaly analysis API route. */

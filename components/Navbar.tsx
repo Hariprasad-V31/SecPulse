@@ -26,7 +26,7 @@ export function Navbar({ hasData, fileName, onReset }: NavbarProps) {
               SecPulse
             </p>
             <p className="hidden text-xs text-slate-500 sm:block">
-              AI-Powered Security Maturity Tracker
+              Security Maturity Tracker
             </p>
           </div>
         </div>

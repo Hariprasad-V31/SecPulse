@@ -21,6 +21,7 @@ import type { ParsedData, QuestionRow } from "@/lib/types";
 interface DataTableProps {
   data: ParsedData;
   target: string;
+  remedies?: string[];
 }
 
 function ScoreBadge({ tier }: { tier: ScoreTier | null }) {
@@ -47,9 +48,16 @@ function ScoreBadge({ tier }: { tier: ScoreTier | null }) {
   );
 }
 
-export function DataTable({ data, target }: DataTableProps) {
+export function DataTable({ data, target, remedies = [] }: DataTableProps) {
   const [query, setQuery] = React.useState("");
   const [active, setActive] = React.useState<QuestionRow | null>(null);
+
+  // Map row.id → index in data.rows (which aligns with remedies[])
+  const rowIdToIndex = React.useMemo(() => {
+    const map = new Map<number, number>();
+    data.rows.forEach((row, i) => map.set(row.id, i));
+    return map;
+  }, [data.rows]);
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -125,6 +133,9 @@ export function DataTable({ data, target }: DataTableProps) {
                 <th className="min-w-[200px] px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Comment
                 </th>
+                <th className="min-w-[220px] px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Remediation
+                </th>
                 <th className="px-2 py-3">
                   <span className="sr-only">Details</span>
                 </th>
@@ -134,7 +145,7 @@ export function DataTable({ data, target }: DataTableProps) {
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-4 py-12 text-center text-sm text-slate-500"
                   >
                     No items match{" "}
@@ -149,13 +160,16 @@ export function DataTable({ data, target }: DataTableProps) {
                   const tier = row.scores[target] ?? null;
                   const style = tier ? TIER_STYLES[tier] : null;
                   const comment = row.comments[target] ?? "";
+                  const isNaMissingComment = tier === "na" && !comment.trim();
                   return (
                     <tr
                       key={row.id}
                       onClick={() => setActive(row)}
                       className={cn(
                         "cursor-pointer border-b border-l-2 border-slate-200 transition-colors hover:bg-slate-50",
-                        style ? style.rowAccent : "border-l-transparent",
+                        isNaMissingComment
+                          ? "border-l-rose-400 bg-rose-50/50"
+                          : style ? style.rowAccent : "border-l-transparent",
                       )}
                     >
                       <td className="px-4 py-3 align-top">
@@ -182,9 +196,29 @@ export function DataTable({ data, target }: DataTableProps) {
                           >
                             {comment}
                           </span>
+                        ) : isNaMissingComment ? (
+                          <span className="text-xs font-medium text-rose-600">
+                            ⚠ Justification required for N/A
+                          </span>
                         ) : (
                           <span className="text-xs text-slate-400">—</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        {(() => {
+                          const idx = rowIdToIndex.get(row.id) ?? -1;
+                          const remedy = idx >= 0 ? remedies[idx] : "";
+                          return remedy ? (
+                            <span
+                              className="line-clamp-2 max-w-xs text-xs text-indigo-700"
+                              title={remedy}
+                            >
+                              {remedy}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          );
+                        })()}
                       </td>
                       <td className="px-2 py-3 align-top">
                         <button

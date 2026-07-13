@@ -8,7 +8,6 @@ import {
   MessageSquareWarning,
   ScanSearch,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -69,7 +68,12 @@ export function AnomalyReport({
   const commentCount = anomalies.filter(
     (a) => a.type === "Comment Contradiction",
   ).length;
-  const dependencyCount = anomalies.length - commentCount;
+  const dependencyCount = anomalies.filter(
+    (a) => a.type === "Dependency Disconnect",
+  ).length;
+  const naCount = anomalies.filter(
+    (a) => a.type === "Missing N/A Justification",
+  ).length;
 
   return (
     <div className="group relative">
@@ -108,22 +112,12 @@ export function AnomalyReport({
                   {commentCount} comment
                 </Badge>
                 <Badge variant="warning">{dependencyCount} dependency</Badge>
-              </div>
-            )}
-            {source && !loading && (
-              <Badge variant={source === "github-llm" ? "indigo" : "muted"}>
-                {source === "github-llm" ? (
-                  <>
-                    <Sparkles className="h-3 w-3" />
-                    GitHub AI{model ? ` · ${model}` : ""}
-                  </>
-                ) : (
-                  <>
-                    <Cpu className="h-3 w-3" />
-                    Local Engine
-                  </>
+                {naCount > 0 && (
+                  <Badge className="border-rose-200 bg-rose-50 text-rose-700">
+                    {naCount} missing N/A reason
+                  </Badge>
                 )}
-              </Badge>
+              </div>
             )}
           </div>
         </div>

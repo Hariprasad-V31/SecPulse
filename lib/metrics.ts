@@ -104,6 +104,8 @@ export function getAnswerRecords(
       selected_score: bracketLabelForTier(tier),
       tier,
       comment: row.comments[assessment] ?? "",
+      description: row.description,
+      evidence: row.evidence,
     };
   });
 }

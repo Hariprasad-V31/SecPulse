@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "SecPulse — AI-Powered Security Maturity Tracker",
+  title: "SecPulse — Security Maturity Tracker",
   description:
     "Upload security questionnaires, track maturity scores per team, and surface logical anomalies with GitHub Models.",
 };
